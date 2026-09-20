@@ -1,4 +1,4 @@
-"""FastMCP stdio server for Prompt Builder."""
+"""FastMCP stdio server for Prompt Refiner."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 from fastmcp import FastMCP
 from .service import generate_prompt_variants, get_prompt_schema, validate_prompt_brief
 
-mcp = FastMCP("prompt-builder")
+mcp = FastMCP("prompt-refiner")
 TOOL_NAMES = ("get_schema", "validate_brief", "build_prompt_variants")
 
 
@@ -33,12 +33,12 @@ def build_prompt_variants(brief: dict[str, Any]) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> None:
     """Run the MCP server over stdio or print local diagnostics."""
-    parser = argparse.ArgumentParser(description="Run the Prompt Builder MCP server.")
+    parser = argparse.ArgumentParser(description="Run the Prompt Refiner MCP server.")
     parser.add_argument("--list-tools", action="store_true", help="Print tool names and exit.")
     parser.add_argument("--schema", action="store_true", help="Print the prompt brief schema and exit.")
     args = parser.parse_args(argv)
     if args.list_tools:
-        print(json.dumps({"server": "prompt-builder", "tools": list(TOOL_NAMES)}, indent=2))
+        print(json.dumps({"server": "prompt-refiner", "tools": list(TOOL_NAMES)}, indent=2))
         return
     if args.schema:
         print(json.dumps(get_prompt_schema(), indent=2))

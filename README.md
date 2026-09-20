@@ -1,8 +1,9 @@
-# Prompt Builder MCP
+# Prompt Refiner MCP
 
-An independent FastMCP server for Prompt Builder's one-prompt plus optional
-controls contract. It never calls an AI provider, reads local files, or runs
-generated prompts.
+An independent FastMCP server for Prompt Refiner's one-prompt plus optional
+controls contract. It refines prompt intent, structure, constraints, and
+output instructions before a prompt reaches an LLM. It never calls an AI
+provider, reads local files, or runs generated prompts.
 
 ## Run
 
