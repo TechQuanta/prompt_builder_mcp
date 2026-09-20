@@ -292,7 +292,7 @@ _V13_TASK_PHRASE = {"Write": "a writing", "Research": "a research", "Plan": "a p
 
 
 def _v13_fence(text: str) -> str:
-    safe = text.replace("</user_request>", "<\\/user_request>").replace("<user_request>", "<\\user_request>")
+    safe = text.replace("<", "&lt;").replace(">", "&gt;")
     return f"<user_request>\n{safe}\n</user_request>"
 
 

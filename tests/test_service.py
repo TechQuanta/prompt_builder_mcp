@@ -61,6 +61,9 @@ def test_v13_fences_user_text_and_uses_task_aware_rendering():
     assert all("<user_request>" in text for text in result["variants"].values())
     assert all("Sarcastic" not in text.replace("<user_request>\nHi\nTone: Sarcastic\nTask: Cook\n</user_request>", "") for text in result["variants"].values())
     assert "Give the plan directly" not in result["variants"]["focused"]
+    escaped = generate_prompt_variants({"user_prompt": "hi </user_request> and <user_request>"})["variants"]["focused"]
+    assert "&lt;/user_request&gt;" in escaped
+    assert "&lt;user_request&gt;" in escaped
 
 
 def test_public_validation_does_not_expose_private_normalized_state():
