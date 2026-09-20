@@ -137,7 +137,20 @@ def get_prompt_schema() -> dict[str, Any]:
     properties = {"schema_version": {"type": "string", "const": SCHEMA_VERSION}, "user_prompt": {"type": "string", "minLength": 1, "maxLength": 8000, "pattern": r"\S"}, "prompt_nature": {"type": "integer", "minimum": 0, "maximum": 100, "default": 50}, "constraints": {"type": "array", "maxItems": 10, "uniqueItems": True, "items": {"type": "string", "minLength": 1, "maxLength": 200, "pattern": r"\S"}}}
     properties.update({key: {"type": "string", "enum": list(values)} for key, values in ALL_OPTIONS.items()})
     audience_rules = [{"if": {"properties": {"task": {"const": task}}, "required": ["task"]}, "then": {"properties": {"audience": {"enum": list(values)}}}} for task, values in AUDIENCE_BY_TASK.items()]
-    return {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "required": ["user_prompt"], "additionalProperties": False, "properties": properties, "dependentRequired": {field: ["task"] for field in set().union(*TASK_FIELDS.values())}, "allOf": audience_rules, "x-task-fields": {key: list(value) for key, value in TASK_FIELDS.items()}, "x-audience-by-task": {key: list(value) for key, value in AUDIENCE_BY_TASK.items()}, "x-framework-languages": {key: list(value) for key, value in FRAMEWORK_LANGUAGES.items()}, "x-normalization": ["trim user_prompt", "trim each constraint, drop blanks, drop duplicates", "drop prompt_nature when equal to default"], "x-completeness": {"user_prompt_present": 30, "user_prompt_specific_8plus_words": 10, "task_selected": 20, "task_fields_filled_proportional": 25, "tone": 5, "output": 5, "detail": 5}}
+    task_rules = []
+    all_task_fields = set().union(*TASK_FIELDS.values())
+    for task, allowed_fields in TASK_FIELDS.items():
+        forbidden = {field: False for field in all_task_fields - set(allowed_fields)}
+        if task == "Write":
+            forbidden.pop("audience", None)
+        if task == "Plan":
+            forbidden.pop("audience", None)
+        task_rules.append({"if": {"properties": {"task": {"const": task}}, "required": ["task"]}, "then": {"properties": forbidden}})
+    framework_rules = [
+        {"if": {"properties": {"code_framework": {"const": framework}}, "required": ["code_framework"]}, "then": {"properties": {"code_language": {"enum": list(languages)}}}}
+        for framework, languages in FRAMEWORK_LANGUAGES.items()
+    ]
+    return {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "required": ["user_prompt"], "additionalProperties": False, "properties": properties, "dependentRequired": {field: ["task"] for field in all_task_fields}, "allOf": audience_rules + task_rules + framework_rules, "x-task-fields": {key: list(value) for key, value in TASK_FIELDS.items()}, "x-audience-by-task": {key: list(value) for key, value in AUDIENCE_BY_TASK.items()}, "x-framework-languages": {key: list(value) for key, value in FRAMEWORK_LANGUAGES.items()}, "x-normalization": ["trim user_prompt", "trim each constraint, drop blanks, drop duplicates", "drop prompt_nature when equal to default"], "x-error-contract": {"rules": ["Never raise for bad input", "Report all errors", "Invalid briefs score 0"]}, "x-completeness": {"user_prompt_present": 30, "user_prompt_specific_8plus_words": 10, "task_selected": 20, "task_fields_filled_proportional": 25, "tone": 5, "output": 5, "detail": 5}}
 
 
 def _v13_error(field: str, code: str, message: str, **extra: Any) -> dict[str, Any]:
@@ -186,7 +199,7 @@ def _v13_normalize(brief: Any) -> tuple[Any, list[dict[str, str]]]:
     return normalized, notes
 
 
-def validate_prompt_brief(brief: Any) -> dict[str, Any]:
+def _validate_prompt_brief_internal(brief: Any) -> dict[str, Any]:
     normalized, warnings = _v13_normalize(brief)
     errors: list[dict[str, Any]] = []
     properties = get_prompt_schema()["properties"]
@@ -228,7 +241,8 @@ def validate_prompt_brief(brief: Any) -> dict[str, Any]:
     for field in set().union(*TASK_FIELDS.values()):
         if field in normalized and ("task" not in normalized or field not in TASK_FIELDS.get(task, ())):
             code = "requires_task" if "task" not in normalized else "not_available_for_task"
-            errors.append(_v13_error(field, code, f"{field} requires 'task' to be set." if code == "requires_task" else f"{field} is not available for task '{task}'.", allowed_fields=list(TASK_FIELDS.get(task, ()))))
+            error_extra = {} if code == "requires_task" else {"allowed_fields": list(TASK_FIELDS.get(task, ()))}
+            errors.append(_v13_error(field, code, f"{field} requires 'task' to be set." if code == "requires_task" else f"{field} is not available for task '{task}'.", **error_extra))
     if task in AUDIENCE_BY_TASK and "audience" in normalized and "audience" not in invalid_enums and normalized["audience"] not in AUDIENCE_BY_TASK[task]:
         errors.append(_v13_error("audience", "invalid_value", f"audience '{normalized['audience']}' is not valid for task '{task}'.", allowed=list(AUDIENCE_BY_TASK[task]), suggestion=_v13_suggest(normalized["audience"], AUDIENCE_BY_TASK[task])))
     framework, language = normalized.get("code_framework"), normalized.get("code_language")
@@ -249,8 +263,14 @@ def validate_prompt_brief(brief: Any) -> dict[str, Any]:
             warnings.append({"code": "output_conflicts_with_form", "message": f"Output '{normalized['output']}' is unusual for a written piece."})
         if normalized.get("length") == "Short" and normalized.get("detail") == "In-depth":
             warnings.append({"code": "detail_length_tension", "message": "length Short conflicts with detail In-depth."})
-    suggested = [field for field in TASK_FIELDS.get(task, ()) if field not in normalized] + [field for field in ("tone", "output", "detail") if field not in normalized] if valid else []
+    suggested = ((["task"] if not task else [field for field in TASK_FIELDS.get(task, ()) if field not in normalized]) + [field for field in ("tone", "output", "detail") if field not in normalized]) if valid else []
     return {"valid": valid, "score": score, "errors": errors, "warnings": warnings, "missing_fields": [item["field"] for item in errors if item["code"] == "required"], "suggested_fields": suggested, "_normalized": normalized if valid else None}
+
+
+def validate_prompt_brief(brief: Any) -> dict[str, Any]:
+    """Return the public validation contract without internal normalization state."""
+    result = _validate_prompt_brief_internal(brief)
+    return {key: value for key, value in result.items() if not key.startswith("_")}
 
 
 def _v13_nature_phrase(value: int) -> str | None:
@@ -277,7 +297,7 @@ def _v13_fence(text: str) -> str:
 
 
 def generate_prompt_variants(brief: Any) -> dict[str, Any]:
-    validation = validate_prompt_brief(brief)
+    validation = _validate_prompt_brief_internal(brief)
     public_validation = {key: value for key, value in validation.items() if not key.startswith("_")}
     if not validation["valid"]:
         return {"validation": public_validation, "normalized_brief": None, "variants": None}
