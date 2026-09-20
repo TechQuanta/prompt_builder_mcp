@@ -1,19 +1,22 @@
-# prompt_builder_mcp
+# Prompt Builder MCP
 
-An independent Python MCP server for deterministic prompt design. It does not
-call an AI provider, read user files, or execute generated prompts.
-
-## Tools
-
-- `validate_prompt_brief`: validate and score a structured prompt brief.
-- `generate_prompt_variants`: return focused, detailed, and structured prompts.
-- `get_prompt_schema`: return the portable JSON schema clients should collect.
+An independent FastMCP server for Prompt Builder's one-prompt plus optional
+controls contract. It never calls an AI provider, reads local files, or runs
+generated prompts.
 
 ## Run
 
 ```bash
+python -m venv .venv
+.venv\Scripts\activate
 python -m pip install -e .
 prompt-builder-mcp
 ```
 
-Configure an MCP client with `prompt-builder-mcp` as its stdio command.
+MCP client configuration:
+
+```json
+{"mcpServers":{"prompt-builder":{"command":"prompt-builder-mcp"}}}
+```
+
+Tools: `get_schema`, `validate_brief`, and `build_prompt_variants`.
