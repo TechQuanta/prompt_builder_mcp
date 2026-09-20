@@ -1,4 +1,6 @@
 from prompt_builder_mcp.service import generate_prompt_variants, get_prompt_schema, validate_prompt_brief
+from prompt_builder_mcp.server import main
+import json
 
 
 BRIEF = {"user_prompt": "Write a launch plan", "audience": "Executive", "constraints": ["30 days"], "output": "Markdown", "tone": "Technical"}
@@ -16,3 +18,8 @@ def test_variants_are_deterministic():
     result = generate_prompt_variants(BRIEF)
     assert result["validation"]["score"] == 100
     assert "User request: Write a launch plan" in result["variants"]["structured"]
+
+
+def test_diagnostic_lists_public_tools(capsys):
+    main(["--list-tools"])
+    assert json.loads(capsys.readouterr().out)["tools"] == ["get_schema", "validate_brief", "build_prompt_variants"]

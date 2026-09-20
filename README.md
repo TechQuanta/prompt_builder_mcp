@@ -20,3 +20,10 @@ MCP client configuration:
 ```
 
 Tools: `get_schema`, `validate_brief`, and `build_prompt_variants`.
+
+Before connecting a client, inspect the server locally:
+
+```bash
+prompt-builder-mcp --list-tools
+prompt-builder-mcp --schema
+```
