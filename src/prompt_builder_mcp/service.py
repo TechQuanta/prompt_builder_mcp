@@ -59,7 +59,7 @@ def get_prompt_schema() -> dict[str, Any]:
         **{key: {"type": "string", "enum": list(values), "optional": True} for key, values in ALL_OPTIONS.items()},
     }
     return {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "type": "prompt_refinement",
         "required": ["user_prompt"],
         "properties": properties,
