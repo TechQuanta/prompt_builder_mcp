@@ -30,3 +30,31 @@ Before connecting a client, inspect the server locally:
 prompt-builder-mcp --list-tools
 prompt-builder-mcp --schema
 ```
+
+## Horizon Deploy
+
+Use the repository form with these values:
+
+| Field | Value |
+| --- | --- |
+| Server name | `prompt-builder` |
+| Entrypoint | `server.py` |
+| Requirements | `requirements.txt` |
+| Transport | Streamable HTTP |
+
+The root `server.py` adds the `src/` package path, binds to `HOST` (default
+`0.0.0.0`) and `PORT` (default `8000`), and serves the MCP endpoint at
+`/mcp`. It is intended for hosted deployment and does not replace the local
+stdio entry point.
+
+For local HTTP testing:
+
+```powershell
+python server.py
+```
+
+For a local stdio client:
+
+```powershell
+prompt-builder-mcp
+```
