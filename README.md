@@ -1,5 +1,7 @@
 # Prompt Refiner MCP
 
+Built openly by [TechQuanta Community](https://github.com/TechQuanta). Contributions are welcome through the repository's issues and pull requests.
+
 An independent FastMCP server for Prompt Refiner's one-prompt plus optional
 controls contract. It refines prompt intent, structure, constraints, and
 output instructions before a prompt reaches an LLM. It never calls an AI

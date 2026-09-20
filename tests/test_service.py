@@ -3,7 +3,7 @@ from prompt_builder_mcp.server import main
 import json
 
 
-BRIEF = {"user_prompt": "Write a launch plan", "audience": "Executive", "constraints": ["30 days"], "output": "Markdown", "tone": "Technical"}
+BRIEF = {"user_prompt": "Write a launch plan", "task": "Write", "audience": "Executive", "constraints": ["30 days"], "output": "Markdown", "tone": "Technical"}
 
 
 def test_schema_describes_required_fields():
@@ -23,3 +23,9 @@ def test_variants_are_deterministic():
 def test_diagnostic_lists_public_tools(capsys):
     main(["--list-tools"])
     assert json.loads(capsys.readouterr().out)["tools"] == ["get_schema", "validate_brief", "build_prompt_variants"]
+
+
+def test_image_controls_are_limited_to_image_prompts():
+    assert validate_prompt_brief({"user_prompt": "A portrait", "task": "Image prompt", "aspect_ratio": "4:5"})["valid"]
+    with __import__("pytest").raises(ValueError, match="not available"):
+        validate_prompt_brief({"user_prompt": "A plan", "task": "Plan", "aspect_ratio": "4:5"})
