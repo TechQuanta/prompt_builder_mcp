@@ -1,18 +1,18 @@
 from prompt_builder_mcp.service import generate_prompt_variants, get_prompt_schema, validate_prompt_brief
 
 
-BRIEF = {"goal": "Write a launch plan", "audience": "Founders", "context": "B2B SaaS", "constraints": ["30 days"], "output_format": "Markdown", "tone": "Practical", "provider": "universal"}
+BRIEF = {"user_prompt": "Write a launch plan", "audience": "Executive", "constraints": ["30 days"], "output": "Markdown", "tone": "Technical"}
 
 
 def test_schema_describes_required_fields():
-    assert "goal" in get_prompt_schema()["required"]
+    assert "user_prompt" in get_prompt_schema()["required"]
 
 
 def test_validation_reports_missing_fields():
-    assert validate_prompt_brief({"goal": "x"})["missing_fields"] == ["audience", "context", "output_format", "tone"]
+    assert validate_prompt_brief({})["missing_fields"] == ["user_prompt"]
 
 
 def test_variants_are_deterministic():
     result = generate_prompt_variants(BRIEF)
     assert result["validation"]["score"] == 100
-    assert "Goal: Write a launch plan" in result["variants"]["structured"]
+    assert "User request: Write a launch plan" in result["variants"]["structured"]
