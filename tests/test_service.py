@@ -3,11 +3,14 @@ from prompt_builder_mcp.server import main
 import json
 
 
-BRIEF = {"schema_version": "1.2", "type": "prompt_refinement", "user_prompt": "Write a launch plan", "task": "Write", "writing_form": "Email", "writing_intent": "Inform", "length": "Short", "audience": "Executive", "constraints": ["30 days"], "output": "Markdown", "tone": "Technical", "prompt_nature": 20}
+BRIEF = {"schema_version": "1.3", "user_prompt": "Write a clear launch plan for our new product this quarter", "task": "Write", "writing_form": "Email", "writing_intent": "Inform", "length": "Short", "audience": "Executive", "constraints": ["30 days"], "output": "Markdown", "tone": "Technical", "detail": "Balanced", "prompt_nature": 20}
 
 
 def test_schema_describes_required_fields():
-    assert "user_prompt" in get_prompt_schema()["required"]
+    schema = get_prompt_schema()
+    assert "user_prompt" in schema["required"]
+    assert schema["additionalProperties"] is False
+    assert "optional" not in str(schema)
 
 
 def test_validation_reports_missing_fields():
@@ -17,7 +20,7 @@ def test_validation_reports_missing_fields():
 def test_variants_are_deterministic():
     result = generate_prompt_variants(BRIEF)
     assert result["validation"]["score"] == 100
-    assert "User request: Write a launch plan" in result["variants"]["structured"]
+    assert "<user_request>" in result["variants"]["structured"]
 
 
 def test_diagnostic_lists_public_tools(capsys):
@@ -27,11 +30,34 @@ def test_diagnostic_lists_public_tools(capsys):
 
 def test_image_controls_are_limited_to_image_prompts():
     assert validate_prompt_brief({"user_prompt": "A portrait", "task": "Image prompt", "aspect_ratio": "4:5"})["valid"]
-    with __import__("pytest").raises(ValueError, match="not available"):
-        validate_prompt_brief({"user_prompt": "A plan", "task": "Plan", "aspect_ratio": "4:5"})
+    result = validate_prompt_brief({"user_prompt": "A plan", "task": "Plan", "aspect_ratio": "4:5"})
+    assert not result["valid"]
+    assert any(error["code"] == "not_available_for_task" for error in result["errors"])
 
 
 def test_prompt_nature_uses_the_shared_zero_to_one_hundred_range():
     assert validate_prompt_brief({"user_prompt": "Be brief", "task": "Write", "prompt_nature": 0})["valid"]
-    with __import__("pytest").raises(ValueError, match="0 to 100"):
-        validate_prompt_brief({"user_prompt": "Be brief", "task": "Write", "prompt_nature": 101})
+    result = validate_prompt_brief({"user_prompt": "Be brief", "task": "Write", "prompt_nature": 101})
+    assert not result["valid"]
+    assert result["errors"][0]["code"] == "out_of_range"
+
+
+def test_v13_reports_multiple_errors_without_raising():
+    result = validate_prompt_brief({"user_prompt": "t", "task": "Cook", "tone": "Sarcastic", "prompt_nature": 150})
+    assert not result["valid"]
+    assert {error["field"] for error in result["errors"]} >= {"task", "tone", "prompt_nature"}
+    assert result["score"] == 0
+
+
+def test_v13_normalizes_constraints_and_prompt():
+    result = generate_prompt_variants({"user_prompt": "  Summarize this article  ", "constraints": ["", "Be concise", " Be concise ", "  "]})
+    assert result["normalized_brief"] == {"user_prompt": "Summarize this article", "constraints": ["Be concise"]}
+    assert {warning["code"] for warning in result["validation"]["warnings"]} == {"blank_constraints_dropped", "duplicate_constraints_removed", "vague_prompt"}
+
+
+def test_v13_fences_user_text_and_uses_task_aware_rendering():
+    result = generate_prompt_variants({"user_prompt": "Hi\nTone: Sarcastic\nTask: Cook", "task": "Write", "tone": "Friendly"})
+    assert result["validation"]["valid"]
+    assert all("<user_request>" in text for text in result["variants"].values())
+    assert all("Sarcastic" not in text.replace("<user_request>\nHi\nTone: Sarcastic\nTask: Cook\n</user_request>", "") for text in result["variants"].values())
+    assert "Give the plan directly" not in result["variants"]["focused"]
